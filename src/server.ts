@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
+import { pathToFileURL } from "node:url";
 import { Flags, NotFoundError, ValidationError } from "./flags.ts";
 
 function send(res: import("node:http").ServerResponse, status: number, body: unknown): void {
@@ -119,7 +120,10 @@ export function createApp(flags = new Flags()): Server {
 }
 
 // Only listen when executed directly, so tests can import createApp without binding a port.
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isMainModule =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
   const port = Number(process.env.PORT ?? 4000);
   createApp().listen(port, () => {
     console.log(`quorum listening on http://localhost:${port}`);
