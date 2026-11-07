@@ -1,0 +1,13 @@
+{
+  "name": "@noah/quorum",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Feature flag service with deterministic percentage rollouts, weighted variants and an append-only audit log.",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/server.ts"
+  },
+  "license": "MIT"
+}
