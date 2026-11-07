@@ -1,6 +1,26 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
 import { Flags, NotFoundError, ValidationError } from "./flags.ts";
+
+let cachedIndex: string | null = null;
+
+/** Read lazily, so importing createApp in a test never depends on the page file. */
+function indexHtml(): string {
+  if (cachedIndex === null) {
+    cachedIndex = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+  }
+  return cachedIndex;
+}
+
+function sendHtml(res: import("node:http").ServerResponse, body: string): void {
+  res.writeHead(200, {
+    "content-type": "text/html; charset=utf-8",
+    "content-length": Buffer.byteLength(body),
+    "cache-control": "no-store",
+  });
+  res.end(body);
+}
 
 function send(res: import("node:http").ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -35,6 +55,10 @@ export function createApp(flags = new Flags()): Server {
     const parts = url.pathname.split("/").filter(Boolean);
 
     try {
+      if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
+        return sendHtml(res, indexHtml());
+      }
+
       if (req.method === "GET" && url.pathname === "/health") {
         return send(res, 200, { status: "ok", flags: flags.list().length });
       }
@@ -120,6 +144,8 @@ export function createApp(flags = new Flags()): Server {
 }
 
 // Only listen when executed directly, so tests can import createApp without binding a port.
+// pathToFileURL matters on Windows: process.argv[1] is a drive path ("C:\\Users\\..."),
+// which never equals the file:/// URL form, so a template comparison silently skips the bind.
 const isMainModule =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 

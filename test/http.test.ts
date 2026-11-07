@@ -114,6 +114,19 @@ test("unknown flags and routes are 404", async () => {
   });
 });
 
+test("the dashboard is served at the root as HTML", async () => {
+  await withServer(async (url) => {
+    const res = await fetch(`${url}/`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    const html = await res.text();
+    assert.match(html, /Quorum/);
+    assert.match(html, /\/flags\//);
+    assert.match(html, /evaluate/);
+  });
+});
+
 test("a deleted flag is gone but was audited first", async () => {
   await withServer(async (url) => {
     await fetch(`${url}/flags`, {

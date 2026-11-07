@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>Quorum — feature flags</title>
+<style>
+  :root {
+    --ink: #14181d;
+    --muted: #5b6670;
+    --line: #e2e6ea;
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --accent: #2f5bea;
+    --accent-soft: #eaeffd;
+    --ok: #177245;
+    --bad: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 22px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--ink); color: #fff;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 15px;
+  }
+  .brand strong { display: block; font-size: 15.5px; letter-spacing: -0.01em; }
+  .brand span.sub { display: block; color: var(--muted); font-size: 12.5px; }
+  .pill {
+    font-size: 12.5px; font-weight: 600;
+    padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted);
+    background: #fff; white-space: nowrap;
+  }
+  .pill.ok { color: var(--ok); border-color: #cfe6da; background: #f2faf5; }
+  .pill.bad { color: var(--bad); border-color: #f0cdca; background: #fdf4f3; }
+
+  main {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 18px;
+    padding: 18px 22px 40px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    align-self: start;
+  }
+  h2 {
+    margin: 0 0 12px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  h2 .count { color: var(--muted); font-weight: 600; }
+
+  .list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 4px; }
+  .flagbtn {
+    width: 100%; text-align: left; cursor: pointer;
+    background: none; border: 1px solid transparent; border-radius: 9px;
+    padding: 9px 10px; font: inherit; color: inherit;
+    display: grid; gap: 2px;
+  }
+  .flagbtn:hover { background: #f2f4f7; }
+  .flag.active .flagbtn { background: var(--accent-soft); border-color: #cfdbfb; }
+  .fkey { font-weight: 650; font-size: 14px; word-break: break-word; }
+  .fmeta { color: var(--muted); font-size: 12.5px; }
+
+  .create { border-top: 1px solid var(--line); padding-top: 13px; display: grid; gap: 8px; }
+  .row { display: flex; gap: 8px; }
+  .row > * { min-width: 0; }
+  input[type="text"], input[type="number"] {
+    width: 100%; padding: 8px 10px; font: inherit;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit;
+  }
+  input:focus-visible, button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer;
+    padding: 8px 13px; border-radius: 8px;
+    border: 1px solid var(--ink); background: var(--ink); color: #fff;
+  }
+  button.secondary { background: #fff; color: var(--ink); border-color: var(--line); }
+  button.danger { background: #fff; color: var(--bad); border-color: #f0cdca; }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .hint { margin: 0; color: var(--muted); font-size: 12px; }
+
+  .empty { color: var(--muted); margin: 4px 0; }
+
+  .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .detail-head h3 { margin: 0; font-size: 19px; letter-spacing: -0.015em; word-break: break-word; }
+  .detail-head .meta { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .badge {
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); background: #fff;
+  }
+  .badge.on { color: var(--ok); border-color: #cfe6da; background: #f2faf5; }
+  .badge.ramp { color: var(--accent); border-color: #cfdbfb; background: var(--accent-soft); }
+
+  .block { border-top: 1px solid var(--line); margin-top: 15px; padding-top: 14px; }
+  .label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 7px; }
+
+  .slider-row { display: flex; align-items: center; gap: 14px; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .bigpct { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 20px; min-width: 78px; text-align: right; }
+
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: #fff; color: var(--muted); font-weight: 600; padding: 6px 12px; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .strip { display: flex; height: 22px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: #f1f3f5; }
+  .strip i { flex: 1; background: #f1f3f5; }
+  .strip i.in { background: var(--accent); }
+  .stripline { position: relative; margin-top: 6px; height: 18px; color: var(--muted); font-size: 12px; }
+  .marker { position: absolute; top: -24px; width: 2px; height: 26px; background: var(--ink); border-radius: 1px; }
+  .marker::after {
+    content: attr(data-label); position: absolute; top: 26px; left: 50%;
+    transform: translateX(-50%); white-space: nowrap; font-weight: 650; color: var(--ink);
+  }
+
+  .result { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .chip { font-size: 12.5px; padding: 5px 10px; border-radius: 999px; background: #f2f4f7; color: var(--muted); font-weight: 600; }
+  .chip.yes { background: #f2faf5; color: var(--ok); }
+  .chip.no { background: #fdf4f3; color: var(--bad); }
+
+  .audit { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .audit li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .audit li:last-child { border-bottom: 0; }
+  .audit .when { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  .audit .what { font-weight: 600; }
+  .audit .who { color: var(--muted); font-weight: 400; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    background: var(--bad); color: #fff; padding: 10px 16px; border-radius: 9px;
+    font-size: 13.5px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.18); max-width: min(560px, 90vw);
+  }
+  footer { max-width: 1180px; margin: 0 auto; padding: 0 22px 34px; color: var(--muted); font-size: 12.5px; }
+  code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">Q</div>
+    <div>
+      <strong>Quorum</strong>
+      <span class="sub">deterministic feature flags</span>
+    </div>
+  </div>
+  <div id="health" class="pill">checking…</div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Flags <span id="flagCount" class="count"></span></h2>
+    <ul id="flagList" class="list"></ul>
+    <form id="create" class="create">
+      <input id="newKey" name="key" type="text" placeholder="checkout.v2" aria-label="new flag key" required />
+      <div class="row">
+        <input id="newRollout" name="rollout" type="number" min="0" max="100" step="0.1" value="0" aria-label="initial rollout percent" />
+        <button type="submit">Create</button>
+      </div>
+      <p class="hint">Key: 2–64 chars of lowercase letters, digits, dot, dash or underscore.</p>
+    </form>
+  </section>
+
+  <section class="card" id="detail">
+    <p class="empty">Select a flag, or create one.</p>
+  </section>
+</main>
+
+<footer>
+  Every evaluation hashes <code>flag key + subject</code> into one of 100,000 buckets. The bucket never moves when
+  the rollout changes, which is why ramping from 10% to 50% can only add people.
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+  const $ = (sel) => document.querySelector(sel);
+
+  const state = {
+    flags: [],
+    current: null,
+    audit: [],
+    evaluation: null,
+    subject: "user-42",
+  };
+
+  function el(tag, props = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (key === "className") node.className = value;
+      else if (key === "dataset") Object.assign(node.dataset, value);
+      else if (key.startsWith("on") && typeof value === "function") {
+        // DOM handler properties are lowercase (onclick, oninput); addEventListener
+        // is unambiguous and does not depend on the property name being reflected.
+        node.addEventListener(key.slice(2).toLowerCase(), value);
+      } else if (key in node) node[key] = value;
+      else node.setAttribute(key, value);
+    }
+    for (const child of children) {
+      node.append(child && child.nodeType ? child : document.createTextNode(String(child ?? "")));
+    }
+    return node;
+  }
+
+  function toast(message) {
+    const node = $("#toast");
+    node.textContent = message;
+    node.hidden = false;
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => { node.hidden = true; }, 4000);
+  }
+
+  async function api(path, { method = "GET", body } = {}) {
+    const res = await fetch(path, {
+      method,
+      headers: body ? { "content-type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 204) return null;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || `request failed (${res.status})`);
+    return data;
+  }
+
+  const percent = (buckets) => {
+    const pct = buckets / 1000;
+    return Number.isInteger(pct) ? String(pct) : pct.toFixed(1);
+  };
+
+  async function refreshHealth() {
+    const pill = $("#health");
+    try {
+      const health = await api("/health");
+      pill.textContent = `ok · ${health.flags} flag${health.flags === 1 ? "" : "s"}`;
+      pill.className = "pill ok";
+    } catch {
+      pill.textContent = "api unreachable";
+      pill.className = "pill bad";
+    }
+  }
+
+  async function refreshFlags() {
+    const data = await api("/flags");
+    state.flags = data.flags ?? [];
+    renderList();
+    $("#flagCount").textContent = state.flags.length ? `(${state.flags.length})` : "";
+  }
+
+  function renderList() {
+    const list = $("#flagList");
+    list.replaceChildren();
+    if (!state.flags.length) {
+      list.append(el("li", { className: "empty" }, "No flags yet."));
+      return;
+    }
+    for (const flag of state.flags) {
+      const active = state.current && state.current.key === flag.key;
+      const button = el("button", { className: "flagbtn", type: "button", onClick: () => select(flag.key) },
+        el("span", { className: "fkey" }, flag.key),
+        el("span", { className: "fmeta" }, `${flag.state} · ${percent(flag.rollout)}% · v${flag.version}`),
+      );
+      list.append(el("li", { className: active ? "flag active" : "flag" }, button));
+    }
+  }
+
+  async function select(key) {
+    try {
+      const [flag, audit] = await Promise.all([
+        api(`/flags/${encodeURIComponent(key)}`),
+        api(`/flags/${encodeURIComponent(key)}/audit`),
+      ]);
+      state.current = flag;
+      state.audit = audit.entries ?? [];
+      state.evaluation = null;
+      renderList();
+      renderDetail();
+      await evaluate();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  async function patch(body) {
+    const key = state.current.key;
+    try {
+      const flag = await api(`/flags/${encodeURIComponent(key)}`, { method: "PATCH", body: { ...body, actor: "dashboard" } });
+      state.current = flag;
+      state.audit = (await api(`/flags/${encodeURIComponent(key)}/audit`)).entries ?? [];
+      await refreshFlags();
+      renderDetail();
+      await evaluate();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  async function evaluate() {
+    if (!state.current) return;
+    const subject = $("#subject")?.value.trim() || state.subject;
+    state.subject = subject;
+    try {
+      state.evaluation = await api(
+        `/flags/${encodeURIComponent(state.current.key)}/evaluate?subject=${encodeURIComponent(subject)}`,
+      );
+      renderResult();
+      renderStrip();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  function renderDetail() {
+    const flag = state.current;
+    const detail = $("#detail");
+    if (!flag) {
+      detail.replaceChildren(el("p", { className: "empty" }, "Select a flag, or create one."));
+      return;
+    }
+
+    const badge = el("span", { className: `badge ${flag.state}` }, flag.state);
+    const head = el("div", { className: "detail-head" },
+      el("div", {},
+        el("h3", {}, flag.key),
+        el("div", { className: "meta" },
+          `version ${flag.version} · created ${new Date(flag.createdAt).toLocaleString()}${flag.description ? ` · ${flag.description}` : ""}`),
+      ),
+      badge,
+    );
+
+    const slider = el("input", {
+      type: "range", min: "0", max: "100", step: "0.1", value: String(flag.rollout / 1000),
+      "aria-label": "rollout percent",
+      onInput: (event) => { $("#bigpct").textContent = `${event.target.value}%`; },
+      onChange: (event) => patch({ state: "ramp", rollout: Math.round(Number(event.target.value) * 1000) }),
+    });
+    const pctLabel = el("div", { className: "bigpct", id: "bigpct" }, `${percent(flag.rollout)}%`);
+
+    const stateButtons = el("div", { className: "seg", role: "group", "aria-label": "flag state" });
+    for (const value of ["off", "ramp", "on"]) {
+      stateButtons.append(el("button", {
+        type: "button",
+        "aria-pressed": String(flag.state === value),
+        onClick: () => patch({ state: value }),
+      }, value));
+    }
+
+    const subject = el("input", {
+      id: "subject", type: "text", value: state.subject, "aria-label": "subject id",
+      onInput: debounce(() => evaluate(), 260),
+    });
+
+    const strip = el("div", { className: "strip", id: "strip" });
+    const stripline = el("div", { className: "stripline", id: "stripline" });
+    const result = el("div", { className: "result", id: "result" });
+
+    const audit = el("ul", { className: "audit", id: "audit" });
+    for (const entry of [...state.audit].reverse()) {
+      audit.append(el("li", {},
+        el("span", { className: "what" }, `v${entry.version} ${entry.action} `, el("span", { className: "who" }, `by ${entry.actor}`)),
+        el("span", { className: "when" }, new Date(entry.at).toLocaleTimeString()),
+      ));
+    }
+    if (!state.audit.length) audit.append(el("li", { className: "when" }, "No changes recorded."));
+
+    detail.replaceChildren(
+      head,
+      el("div", { className: "block" },
+        el("p", { className: "label" }, "Rollout"),
+        el("div", { className: "slider-row" }, slider, pctLabel),
+        strip, stripline,
+      ),
+      el("div", { className: "block" },
+        el("p", { className: "label" }, "State"),
+        stateButtons,
+      ),
+      el("div", { className: "block" },
+        el("p", { className: "label" }, "Evaluate a subject"),
+        subject,
+        result,
+      ),
+      el("div", { className: "block" },
+        el("p", { className: "label" }, "Audit"),
+        audit,
+      ),
+      el("div", { className: "block actions" },
+        el("button", {
+          className: "danger", type: "button",
+          onClick: async () => {
+            if (!confirm(`Delete ${flag.key}? Its history stays in the audit log.`)) return;
+            try {
+              await api(`/flags/${encodeURIComponent(flag.key)}`, { method: "DELETE" });
+              state.current = null;
+              state.evaluation = null;
+              await refreshFlags();
+              renderDetail();
+              await refreshHealth();
+            } catch (err) { toast(err.message); }
+          },
+        }, "Delete flag"),
+      ),
+    );
+
+    renderResult();
+    renderStrip();
+  }
+
+  function renderResult() {
+    const box = $("#result");
+    if (!box) return;
+    box.replaceChildren();
+    const evaluation = state.evaluation;
+    if (!evaluation) {
+      box.append(el("span", { className: "chip" }, "no evaluation yet"));
+      return;
+    }
+    box.append(
+      el("span", { className: evaluation.enabled ? "chip yes" : "chip no" }, evaluation.enabled ? "enabled" : "disabled"),
+      el("span", { className: "chip" }, `reason: ${evaluation.reason}`),
+      el("span", { className: "chip" }, `variant: ${evaluation.variant ?? "—"}`),
+      el("span", { className: "chip" }, evaluation.bucket === null ? "bucket: —" : `bucket: ${evaluation.bucket}`),
+    );
+  }
+
+  function renderStrip() {
+    const strip = $("#strip");
+    if (!strip || !state.current) return;
+    const threshold = state.current.rollout / 1000; // percent
+    strip.replaceChildren();
+    for (let i = 0; i < 100; i++) {
+      strip.append(el("i", { className: i < threshold ? "in" : "" }));
+    }
+
+    const line = $("#stripline");
+    line.replaceChildren();
+    const bucket = state.evaluation?.bucket;
+    if (typeof bucket === "number") {
+      const marker = el("span", { className: "marker", dataset: { label: state.subject } });
+      marker.style.left = `calc(${bucket / 1000}% - 1px)`;
+      line.append(marker);
+    }
+    line.append(el("span", { style: "float:right" }, `${percent(state.current.rollout)}% of subjects in`));
+  }
+
+  function debounce(fn, ms) {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  $("#create").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const key = $("#newKey").value.trim();
+    const rollout = Math.round(Number($("#newRollout").value || 0) * 1000);
+    try {
+      await api("/flags", { method: "POST", body: { key, rollout, state: rollout > 0 ? "ramp" : "off", actor: "dashboard" } });
+      $("#newKey").value = "";
+      $("#newRollout").value = "0";
+      await refreshFlags();
+      await refreshHealth();
+      await select(key);
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  (async function boot() {
+    await refreshHealth();
+    try {
+      await refreshFlags();
+      if (state.flags.length) await select(state.flags[0].key);
+    } catch (err) {
+      toast(err.message);
+    }
+    setInterval(refreshHealth, 15000);
+  })();
+</script>
+</body>
+</html>
