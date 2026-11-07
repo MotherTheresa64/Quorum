@@ -3,11 +3,23 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Feature flag service with deterministic percentage rollouts, weighted variants and an append-only audit log.",
-  "engines": { "node": ">=24" },
+  "description": "Feature flags with deterministic percentage rollouts, weighted variants and an audit log, plus a browser demo.",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "test": "node --test",
     "start": "node src/server.ts"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MotherTheresa64/quorum.git"
+  },
+  "homepage": "https://github.com/MotherTheresa64/quorum#readme",
+  "keywords": [
+    "nodejs",
+    "typescript",
+    "zero-dependencies"
+  ]
 }
